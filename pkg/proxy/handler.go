@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -50,7 +51,12 @@ func NewStorageContainerReverseProxy(target *url.URL) *httputil.ReverseProxy {
 		req.Host = target.Host
 		log.Printf("Proxy request to: %s\n", req.URL)
 	}
-	return &httputil.ReverseProxy{Director: director}
+	return &httputil.ReverseProxy{
+		Director: director,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
 }
 
 func (scp *StorageContainerProxyHandler) Listen() {
