@@ -86,7 +86,10 @@ func SubdomainAsSubpath(domain string, env string) func(http.Handler) http.Handl
 	domainDotCount := strings.Count(domain, ".")
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			host := req.Host[:strings.Index(req.Host, ":")]
+			host := req.Host
+			if strings.Contains(host, ":") {
+				host = host[:strings.Index(host, ":")]
+			}
 			if !strings.HasSuffix(host, domain) {
 				log.Printf("ERROR: %s did not match base domain %s", host, domain)
 				res.WriteHeader(500)
