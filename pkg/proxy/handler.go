@@ -17,12 +17,14 @@ type Config struct {
 	AzureStorageAccount   string
 	AzureStorageContainer string
 	BaseDomain            string
+	DefaultEnv            string
 }
 
 type StorageContainerProxyHandler struct {
 	AzureStorageAccount   string
 	AzureStorageContainer string
 	BaseDomain            string
+	DefaultEnv            string
 }
 
 func NewHandler(config *Config) StorageContainerProxyHandler {
@@ -30,6 +32,7 @@ func NewHandler(config *Config) StorageContainerProxyHandler {
 		AzureStorageAccount:   config.AzureStorageAccount,
 		AzureStorageContainer: config.AzureStorageContainer,
 		BaseDomain:            config.BaseDomain,
+		DefaultEnv:            config.DefaultEnv,
 	}
 }
 
@@ -64,7 +67,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 
 	r := chi.NewRouter()
 
-	// r.Use(SubdomainAsSubpath(scp.BaseDomain))
+	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
 	r.Use(TryIndexOnNotFound)
 
 	r.Handle("/*", NewStorageContainerReverseProxy(&url.URL{
@@ -79,7 +82,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	}
 }
 
-func SubdomainAsSubpath(domain string) func(http.Handler) http.Handler {
+func SubdomainAsSubpath(domain string, env string) func(http.Handler) http.Handler {
 	domainDotCount := strings.Count(domain, ".")
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
@@ -92,7 +95,7 @@ func SubdomainAsSubpath(domain string) func(http.Handler) http.Handler {
 			hostDotCount := strings.Count(host, ".")
 			if hostDotCount == domainDotCount {
 				// Default path
-				req.URL.Path = "/default" + req.URL.Path
+				req.URL.Path = "/" + env + req.URL.Path
 			} else if hostDotCount == domainDotCount+1 {
 				// Sub-path
 				req.URL.Path = strings.TrimSuffix(host, domain)
