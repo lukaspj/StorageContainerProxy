@@ -181,14 +181,14 @@ func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) ht
 			}
 
 			if resp.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
-				target.Path = target.Path + ".html"
-				req.URL.Path = target.Path
-				resp, err = http.Head(target.String())
+				urlCopy.Path = urlCopy.Path + ".html"
+				resp, err = http.Head(urlCopy.String())
 				if err != nil {
 					res.WriteHeader(500)
 					log.Fatalf("%v", err)
 					return
 				}
+				req.URL.Path = req.URL.Path + ".html"
 			}
 			next.ServeHTTP(res, req)
 		})
