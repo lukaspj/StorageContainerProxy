@@ -1,19 +1,21 @@
 package main
 
 import (
-	"StorageContainerProxy/pkg/proxy"
 	"fmt"
-	"github.com/mitchellh/go-homedir"
 	"os"
 
+	"github.com/lukaspj/StorageContainerProxy/pkg/proxy"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
 	// Flags
-	cfgFile string
-	baseUrl string
+	cfgFile          string
+	storageAccount   string
+	storageContainer string
+	baseDomain       string
 )
 
 func GetRootCmd() *cobra.Command {
@@ -24,15 +26,22 @@ func GetRootCmd() *cobra.Command {
 		Short: "StorageContainerProxy is a tool for...",
 		Run: func(cmd *cobra.Command, args []string) {
 			h := proxy.NewHandler(&proxy.Config{
-				AzureStorageAccount: "bryrupteaterfrontend",
-				AzureStorageContainer: "$web",
-				BaseDomain: "localhost",
+				AzureStorageAccount:   storageAccount,
+				AzureStorageContainer: storageContainer,
+				BaseDomain:            baseDomain,
 			})
 			h.Listen()
 		},
 	}
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cobra.yaml)")
+	rootCmd.PersistentFlags().StringVar(&storageAccount, "azStorageAccount", "", "")
+	rootCmd.PersistentFlags().StringVar(&storageContainer, "azStorageContainer", "", "")
+	rootCmd.PersistentFlags().StringVar(&baseDomain, "baseDomain", "", "")
+
+	rootCmd.MarkPersistentFlagRequired("azStorageAccount")
+	rootCmd.MarkPersistentFlagRequired("azStorageContainer")
+	rootCmd.MarkPersistentFlagRequired("baseDomain")
 
 	return rootCmd
 }
