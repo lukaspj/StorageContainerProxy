@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"github.com/go-chi/chi/middleware"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -67,6 +68,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 
 	r := chi.NewRouter()
 
+	r.Use(middleware.Compress(5))
 	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
 	r.Use(TryIndexOnNotFound)
 
