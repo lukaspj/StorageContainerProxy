@@ -137,12 +137,12 @@ func (srrw *StatusRecorderResponseWriter) WriteHeader(code int) {
 }
 
 func (srrw StatusRecorderResponseWriter) WriteTo(res http.ResponseWriter) error {
-	res.WriteHeader(srrw.StatusCode)
 	for k, v := range srrw.header {
 		for _, s := range v {
 			res.Header().Add(k, s)
 		}
 	}
+	res.WriteHeader(srrw.StatusCode)
 	_, err := res.Write(srrw.Buffer.Bytes())
 	return err
 }
