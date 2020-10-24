@@ -167,28 +167,46 @@ func (srrw StatusRecorderResponseWriter) WriteTo(res http.ResponseWriter) error 
 	_, err := res.Write(srrw.Buffer.Bytes())
 	return err
 }
+
+func CheckUrlExists(target *url.URL) (int, error) {
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+	resp, err := client.Head(target.String())
+	if err != nil {
+		return -1, err
+	}
+	return resp.StatusCode, nil
+}
+
 func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 			urlCopy :=  &url.URL{}
 			*urlCopy = *target
 			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
-			resp, err := http.Head(urlCopy.String())
+			statusCode, err := CheckUrlExists(urlCopy)
 			if err != nil {
 				res.WriteHeader(500)
 				log.Fatalf("%v", err)
 				return
 			}
 
-			if resp.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
+			if statusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
 				urlCopy.Path = urlCopy.Path + ".html"
-				resp, err = http.Head(urlCopy.String())
+				statusCode, err := CheckUrlExists(urlCopy)
 				if err != nil {
 					res.WriteHeader(500)
 					log.Fatalf("%v", err)
 					return
 				}
-				req.URL.Path = req.URL.Path + ".html"
+				if statusCode != 404 {
+					req.URL.Path = req.URL.Path + ".html"
+				}
 			}
 			next.ServeHTTP(res, req)
 		})
@@ -201,14 +219,14 @@ func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
 			urlCopy :=  &url.URL{}
 			*urlCopy = *target
 			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
-			resp, err := http.Head(urlCopy.String())
+			statusCode, err := CheckUrlExists(urlCopy)
 			if err != nil {
 				res.WriteHeader(500)
 				log.Fatalf("%v", err)
 				return
 			}
 
-			if resp.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/index.html") {
+			if statusCode == 404 && !strings.HasSuffix(req.URL.Path, "/index.html") {
 				log.Printf("%s was not found, trying index.html instead\n", urlCopy.String())
 				req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")] + "/index.html"
 			}
