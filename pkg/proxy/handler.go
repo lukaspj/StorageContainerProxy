@@ -77,6 +77,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 
 	r.Use(middleware.Compress(5))
 	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
+	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
 	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
 	r.Use(TryIndexOnNotFound(scp.Target))
 
@@ -206,6 +207,37 @@ func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) ht
 				}
 				if statusCode != 404 {
 					req.URL.Path = req.URL.Path + ".html"
+				}
+			}
+			next.ServeHTTP(res, req)
+		})
+	}
+}
+
+func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+			urlCopy :=  &url.URL{}
+			*urlCopy = *target
+			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
+			statusCode, err := CheckUrlExists(urlCopy)
+			if err != nil {
+				res.WriteHeader(500)
+				log.Fatalf("%v", err)
+				return
+			}
+
+			if statusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
+				log.Printf("%s was not found, trying %s/index.html instead\n", urlCopy.String(), urlCopy.String())
+				urlCopy.Path = urlCopy.Path + "/index.html"
+				statusCode, err := CheckUrlExists(urlCopy)
+				if err != nil {
+					res.WriteHeader(500)
+					log.Fatalf("%v", err)
+					return
+				}
+				if statusCode != 404 {
+					req.URL.Path = req.URL.Path + "/index.html"
 				}
 			}
 			next.ServeHTTP(res, req)
