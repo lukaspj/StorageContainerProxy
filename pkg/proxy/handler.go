@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-chi/chi"
@@ -26,6 +27,7 @@ type StorageContainerProxyHandler struct {
 	AzureStorageContainer string
 	BaseDomain            string
 	DefaultEnv            string
+	Target                *url.URL
 }
 
 func NewHandler(config *Config) StorageContainerProxyHandler {
@@ -34,6 +36,11 @@ func NewHandler(config *Config) StorageContainerProxyHandler {
 		AzureStorageContainer: config.AzureStorageContainer,
 		BaseDomain:            config.BaseDomain,
 		DefaultEnv:            config.DefaultEnv,
+		Target: &url.URL{
+			Scheme: "https",
+			Host:   fmt.Sprintf("%s.blob.core.windows.net", config.AzureStorageAccount),
+			Path:   fmt.Sprintf("/%s", config.AzureStorageContainer),
+		},
 	}
 }
 
@@ -70,17 +77,26 @@ func (scp *StorageContainerProxyHandler) Listen() {
 
 	r.Use(middleware.Compress(5))
 	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
-	r.Use(TryIndexOnNotFound)
+	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
+	r.Use(TryIndexOnNotFound(scp.Target))
 
-	r.Handle("/*", NewStorageContainerReverseProxy(&url.URL{
-		Scheme: "https",
-		Host:   fmt.Sprintf("%s.blob.core.windows.net", scp.AzureStorageAccount),
-		Path:   fmt.Sprintf("/%s", scp.AzureStorageContainer),
-	}))
+	r.Handle("/*", NewStorageContainerReverseProxy(scp.Target))
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), r)
 	if err != nil {
 		log.Fatal(fmt.Sprintf("%e", err))
+	}
+}
+
+func GetUrlFromRequest(req *http.Request) *url.URL {
+	scheme := "http"
+	if req.TLS != nil {
+		scheme = "https"
+	}
+
+	return &url.URL{
+		Scheme: scheme,
+		Host:   req.Host,
 	}
 }
 
@@ -151,19 +167,54 @@ func (srrw StatusRecorderResponseWriter) WriteTo(res http.ResponseWriter) error 
 	_, err := res.Write(srrw.Buffer.Bytes())
 	return err
 }
+func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+			urlCopy :=  &url.URL{}
+			*urlCopy = *target
+			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
+			resp, err := http.Head(urlCopy.String())
+			if err != nil {
+				res.WriteHeader(500)
+				log.Fatalf("%v", err)
+				return
+			}
 
-func TryIndexOnNotFound(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		statusWriter := NewStatusRecorderResponseWriter()
-		next.ServeHTTP(statusWriter, req)
-		if !strings.HasSuffix(req.URL.Path, "/index.html") && statusWriter.StatusCode == 404 {
-			statusWriter = NewStatusRecorderResponseWriter()
-			log.Printf("%s was not found, trying index.html instead\n", req.URL)
-			req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")] + "/index.html"
-			next.ServeHTTP(statusWriter, req)
-		}
-		statusWriter.WriteTo(res)
-	})
+			if resp.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
+				target.Path = target.Path + ".html"
+				req.URL.Path = target.Path
+				resp, err = http.Head(target.String())
+				if err != nil {
+					res.WriteHeader(500)
+					log.Fatalf("%v", err)
+					return
+				}
+			}
+			next.ServeHTTP(res, req)
+		})
+	}
+}
+
+func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+			urlCopy :=  &url.URL{}
+			*urlCopy = *target
+			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
+			resp, err := http.Head(urlCopy.String())
+			if err != nil {
+				res.WriteHeader(500)
+				log.Fatalf("%v", err)
+				return
+			}
+
+			if resp.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/index.html") {
+				log.Printf("%s was not found, trying index.html instead\n", urlCopy.String())
+				req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")] + "/index.html"
+			}
+			next.ServeHTTP(res, req)
+		})
+	}
 }
 
 func singleJoiningSlash(a, b string) string {
