@@ -151,7 +151,7 @@ func TryIndexOnNotFound(next http.Handler) http.Handler {
 		if !strings.HasSuffix(req.URL.Path, "/index.html") && statusWriter.StatusCode == 404 {
 			statusWriter = NewStatusRecorderResponseWriter()
 			log.Printf("%s was not found, trying index.html instead\n", req.URL)
-			req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")-1] + "/index.html"
+			req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")] + "/index.html"
 			next.ServeHTTP(statusWriter, req)
 		}
 		statusWriter.WriteTo(res)
