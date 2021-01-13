@@ -185,7 +185,7 @@ func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Ha
 			statusCode, err := CheckUrlExists(urlCopy)
 			if err != nil {
 				res.WriteHeader(500)
-				log.Fatalf("%v", err)
+				log.Printf("[ERROR] %v\n", err)
 				return
 			}
 
@@ -195,7 +195,7 @@ func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Ha
 				statusCode, err := CheckUrlExists(urlCopy)
 				if err != nil {
 					res.WriteHeader(500)
-					log.Fatalf("%v", err)
+					log.Printf("[ERROR] %v\n", err)
 					return
 				}
 				if statusCode != 404 {
@@ -216,7 +216,7 @@ func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
 			statusCode, err := CheckUrlExists(urlCopy)
 			if err != nil {
 				res.WriteHeader(500)
-				log.Fatalf("%v", err)
+				log.Printf("[ERROR] %v\n", err)
 				return
 			}
 
