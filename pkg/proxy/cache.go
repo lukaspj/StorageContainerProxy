@@ -92,19 +92,21 @@ func (c *ResponseCache) get(req *http.Request) *CachedResponseWriter {
 	}
 	r := c.cache[req.Method][req.URL.String()]
 	log.Printf("[INFO] ccache: %v", c.cache)
-	log.Printf("[INFO] ccache for %s: %v", req.URL.String(), c.cache[req.Method][req.URL.String()])
+	log.Printf("[INFO] ccache for %s: %v", req.URL.String(), r)
 	if r == nil {
 		return nil
 	}
 
 	urlMd5, err := CheckUrlMD5(req.URL)
-	log.Printf("[INFO] md5 for: %s is %s\n", req.URL.String(), urlMd5)
+	log.Printf("[INFO] ResponseCache::get md5 for: %s is %s\n", req.URL.String(), urlMd5)
 	if err != nil {
+		log.Printf("[ERROR] ResponseCache::get %v\n", err)
 		return nil
 	}
 
 	if r.md5 != urlMd5 {
 		c.cache[req.Method][req.URL.String()] = nil
+		log.Printf("[WARN] ResponseCache::get md5 mismatch: %s != %s -- updating\n", r.md5, urlMd5)
 		return nil
 	}
 
