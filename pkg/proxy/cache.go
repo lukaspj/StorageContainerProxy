@@ -115,6 +115,8 @@ func (c *ResponseCache) put(req *http.Request, w *CachedResponseWriter) {
 	}
 
 	contentMd5 := w.Header()["Content-MD5"]
+	log.Printf("[INFO] response headers are: %v\n", w.Header())
+	log.Printf("[INFO] found md5 for: %s is %s\n", req.URL.String(), contentMd5)
 	if len(contentMd5) != 1 {
 		return
 	}
