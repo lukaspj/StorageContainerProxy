@@ -86,7 +86,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	}))
 	r.Use(middleware.Compress(5))
 	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
-	// r.Use(RedirectAssets(scp.Target))
+	r.Use(RedirectAssetsByExtension(scp.Target,[]string{"jpg", "png", "jpeg", "js", "woff2"}))
 	r.Use(middleware.ThrottleBacklog(5, 20000, 30 * time.Second))
 	r.Use(Md5Cache())
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
@@ -243,26 +243,30 @@ func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
 	}
 }
 
-func RedirectAssets(target *url.URL) func(http.Handler) http.Handler {
+func RedirectAssetsByExtension(target *url.URL, extensions []string) func(http.Handler) http.Handler {
 	targetQuery := target.RawQuery
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 			ext := filepath.Ext(req.URL.Path)
-			if ext == "" || ext == ".html" {
-				next.ServeHTTP(res, req)
-			} else {
-				redirectUrl := url.URL{}
-				redirectUrl.Scheme = target.Scheme
-				redirectUrl.Host = target.Host
-				redirectUrl.Path, req.URL.RawPath = joinURLPath(target, req.URL)
-				if targetQuery == "" || req.URL.RawQuery == "" {
-					redirectUrl.RawQuery = targetQuery + req.URL.RawQuery
-				} else {
-					redirectUrl.RawQuery = targetQuery + "&" + req.URL.RawQuery
-				}
+			log.Printf("[INFO] extension is: %s\n", ext)
+			for _, e := range extensions {
+				if ext == e {
+					redirectUrl := url.URL{}
+					redirectUrl.Scheme = target.Scheme
+					redirectUrl.Host = target.Host
+					redirectUrl.Path, req.URL.RawPath = joinURLPath(target, req.URL)
+					if targetQuery == "" || req.URL.RawQuery == "" {
+						redirectUrl.RawQuery = targetQuery + req.URL.RawQuery
+					} else {
+						redirectUrl.RawQuery = targetQuery + "&" + req.URL.RawQuery
+					}
 
-				http.Redirect(res, req, redirectUrl.String(), 302)
+					http.Redirect(res, req, redirectUrl.String(), 302)
+					return
+				}
 			}
+
+			next.ServeHTTP(res, req)
 		})
 	}
 }
