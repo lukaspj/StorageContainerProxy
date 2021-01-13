@@ -78,6 +78,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
 	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
 	r.Use(TryIndexOnNotFound(scp.Target))
+	r.Use(RedirectAssets(scp.Target))
 	r.Use(Md5Cache())
 
 	r.Handle("/*", NewStorageContainerReverseProxy(scp.Target))
@@ -225,6 +226,30 @@ func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
 				req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")] + "/index.html"
 			}
 			next.ServeHTTP(res, req)
+		})
+	}
+}
+
+func RedirectAssets(target *url.URL) func(http.Handler) http.Handler {
+	targetQuery := target.RawQuery
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+			ext := filepath.Ext(req.URL.Path)
+			if ext == "" || ext == ".html" {
+				next.ServeHTTP(res, req)
+			} else {
+				redirectUrl := url.URL{}
+				redirectUrl.Scheme = target.Scheme
+				redirectUrl.Host = target.Host
+				redirectUrl.Path, req.URL.RawPath = joinURLPath(target, req.URL)
+				if targetQuery == "" || req.URL.RawQuery == "" {
+					redirectUrl.RawQuery = targetQuery + req.URL.RawQuery
+				} else {
+					redirectUrl.RawQuery = targetQuery + "&" + req.URL.RawQuery
+				}
+
+				http.Redirect(res, req, redirectUrl.String(), 302)
+			}
 		})
 	}
 }
