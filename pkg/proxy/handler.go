@@ -156,6 +156,7 @@ func CheckUrlExists(target *url.URL) (int, error) {
 	if err != nil {
 		return -1, err
 	}
+	resp.Body.Close()
 	return resp.StatusCode, nil
 }
 

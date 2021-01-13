@@ -20,6 +20,7 @@ func CheckUrlMD5(target *url.URL) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	resp.Body.Close()
 	contentMd5 := resp.Header["Content-MD5"]
 	if len(contentMd5) != 1 {
 		return "", errors.New("no md5 present")
