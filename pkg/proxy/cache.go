@@ -72,12 +72,12 @@ type CachedResponse struct {
 }
 
 type ResponseCache struct {
-	cache map[string]map[*url.URL]*CachedResponse
+	cache map[string]map[string]*CachedResponse
 }
 
 func NewMd5ResponseCache() *ResponseCache {
 	return &ResponseCache{
-		cache: make(map[string]map[*url.URL]*CachedResponse),
+		cache: make(map[string]map[string]*CachedResponse),
 	}
 }
 
@@ -87,11 +87,12 @@ func (c *ResponseCache) get(req *http.Request) *CachedResponseWriter {
 	}
 
 	if c.cache[req.Method] == nil {
-		c.cache[req.Method] = make(map[*url.URL]*CachedResponse)
+		c.cache[req.Method] = make(map[string]*CachedResponse)
 		return nil
 	}
-	r := c.cache[req.Method][req.URL]
+	r := c.cache[req.Method][req.URL.String()]
 	log.Printf("[INFO] ccache: %v", c.cache)
+	log.Printf("[INFO] ccache for %s: %v", req.URL.String(), c.cache[req.Method][req.URL.String()])
 	if r == nil {
 		return nil
 	}
@@ -103,7 +104,7 @@ func (c *ResponseCache) get(req *http.Request) *CachedResponseWriter {
 	}
 
 	if r.md5 != urlMd5 {
-		c.cache[req.Method][req.URL] = nil
+		c.cache[req.Method][req.URL.String()] = nil
 		return nil
 	}
 
@@ -112,7 +113,7 @@ func (c *ResponseCache) get(req *http.Request) *CachedResponseWriter {
 
 func (c *ResponseCache) put(req *http.Request, w *CachedResponseWriter) {
 	if c.cache[req.Method] == nil {
-		c.cache[req.Method] = make(map[*url.URL]*CachedResponse)
+		c.cache[req.Method] = make(map[string]*CachedResponse)
 	}
 
 	contentMd5 := w.Header()["Content-Md5"]
@@ -126,5 +127,5 @@ func (c *ResponseCache) put(req *http.Request, w *CachedResponseWriter) {
 		md5:   contentMd5[0],
 		value: w,
 	}
-	c.cache[req.Method][req.URL] = r
+	c.cache[req.Method][req.URL.String()] = r
 }
