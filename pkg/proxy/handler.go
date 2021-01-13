@@ -1,9 +1,9 @@
 package proxy
 
 import (
-	"bytes"
 	"crypto/tls"
 	"fmt"
+	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"log"
 	"net/http"
@@ -11,8 +11,6 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
-
-	"github.com/go-chi/chi"
 )
 
 type Config struct {
@@ -80,6 +78,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
 	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
 	r.Use(TryIndexOnNotFound(scp.Target))
+	r.Use(Md5Cache())
 
 	r.Handle("/*", NewStorageContainerReverseProxy(scp.Target))
 
@@ -132,43 +131,6 @@ func SubdomainAsSubpath(domain string, env string) func(http.Handler) http.Handl
 	}
 }
 
-type StatusRecorderResponseWriter struct {
-	StatusCode int
-	header     http.Header
-	Buffer     bytes.Buffer
-}
-
-func NewStatusRecorderResponseWriter() *StatusRecorderResponseWriter {
-	return &StatusRecorderResponseWriter{
-		StatusCode: http.StatusOK,
-		header:     make(http.Header),
-		Buffer:     bytes.Buffer{},
-	}
-}
-
-func (srrw *StatusRecorderResponseWriter) Header() http.Header {
-	return srrw.header
-}
-
-func (srrw *StatusRecorderResponseWriter) Write(bytes []byte) (int, error) {
-	return srrw.Buffer.Write(bytes)
-}
-
-func (srrw *StatusRecorderResponseWriter) WriteHeader(code int) {
-	srrw.StatusCode = code
-}
-
-func (srrw StatusRecorderResponseWriter) WriteTo(res http.ResponseWriter) error {
-	for k, v := range srrw.header {
-		for _, s := range v {
-			res.Header().Add(k, s)
-		}
-	}
-	res.WriteHeader(srrw.StatusCode)
-	_, err := res.Write(srrw.Buffer.Bytes())
-	return err
-}
-
 func CheckUrlExists(target *url.URL) (int, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -193,7 +155,7 @@ func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) ht
 			statusCode, err := CheckUrlExists(urlCopy)
 			if err != nil {
 				res.WriteHeader(500)
-				log.Fatalf("%v", err)
+				log.Printf("[ERROR]: %v\n", err)
 				return
 			}
 
@@ -202,7 +164,7 @@ func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) ht
 				statusCode, err := CheckUrlExists(urlCopy)
 				if err != nil {
 					res.WriteHeader(500)
-					log.Fatalf("%v", err)
+					log.Printf("[ERROR]: %v\n", err)
 					return
 				}
 				if statusCode != 404 {
@@ -263,6 +225,24 @@ func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
 				req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")] + "/index.html"
 			}
 			next.ServeHTTP(res, req)
+		})
+	}
+}
+
+func Md5Cache() func(next http.Handler) http.Handler {
+	cache := NewMd5ResponseCache()
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+			cachedRes := cache.get(req)
+			if cachedRes != nil {
+				cachedRes.WriteTo(res)
+				return
+			}
+
+			innerRes := NewCachedResponseWriter()
+			next.ServeHTTP(innerRes, req)
+			cache.put(req, innerRes)
+			innerRes.WriteTo(res)
 		})
 	}
 }
