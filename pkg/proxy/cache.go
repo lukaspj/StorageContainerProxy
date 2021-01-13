@@ -118,6 +118,7 @@ func (c *ResponseCache) put(req *http.Request, w *CachedResponseWriter) {
 	log.Printf("[INFO] response headers are: %v\n", w.Header())
 	log.Printf("[INFO] found md5 for: %s is %s\n", req.URL.String(), contentMd5)
 	if len(contentMd5) != 1 {
+		log.Printf("[INFO] len was %d\n", len(contentMd5))
 		return
 	}
 	r := &CachedResponse{
