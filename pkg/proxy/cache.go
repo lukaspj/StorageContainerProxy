@@ -91,8 +91,6 @@ func (c *ResponseCache) get(method string, target *url.URL) *CachedResponseWrite
 		return nil
 	}
 	r := c.cache[method][target.Path]
-	log.Printf("[INFO] ccache: %v", c.cache)
-	log.Printf("[INFO] ccache for %s: %v", target.String(), r)
 	if r == nil {
 		return nil
 	}
@@ -101,7 +99,7 @@ func (c *ResponseCache) get(method string, target *url.URL) *CachedResponseWrite
 	log.Printf("[INFO] ResponseCache::get md5 for: %s is %s\n", target.String(), urlMd5)
 	if err != nil {
 		log.Printf("[ERROR] ResponseCache::get %v\n", err)
-		return nil
+		return r.value
 	}
 
 	if r.md5 != urlMd5 {
