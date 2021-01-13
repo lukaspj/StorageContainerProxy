@@ -91,6 +91,7 @@ func (c *ResponseCache) get(req *http.Request) *CachedResponseWriter {
 		return nil
 	}
 	r := c.cache[req.Method][req.URL]
+	log.Printf("[INFO] ccache: %v", c.cache)
 	if r == nil {
 		return nil
 	}
