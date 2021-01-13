@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 )
@@ -71,17 +72,17 @@ type CachedResponse struct {
 }
 
 type ResponseCache struct {
-	cache         map[string]map[*url.URL]*CachedResponse
+	cache map[string]map[*url.URL]*CachedResponse
 }
 
 func NewMd5ResponseCache() *ResponseCache {
 	return &ResponseCache{
-		cache:         make(map[string]map[*url.URL]*CachedResponse),
+		cache: make(map[string]map[*url.URL]*CachedResponse),
 	}
 }
 
 func (c *ResponseCache) get(req *http.Request) *CachedResponseWriter {
-	if req.Method != "GET" {
+	if req.Method != http.MethodGet {
 		return nil
 	}
 
@@ -95,6 +96,7 @@ func (c *ResponseCache) get(req *http.Request) *CachedResponseWriter {
 	}
 
 	urlMd5, err := CheckUrlMD5(req.URL)
+	log.Printf("[INFO] md5 for: %s is %s\n", req.URL.String(), urlMd5)
 	if err != nil {
 		return nil
 	}
@@ -117,8 +119,8 @@ func (c *ResponseCache) put(req *http.Request, w *CachedResponseWriter) {
 		return
 	}
 	r := &CachedResponse{
-		md5: contentMd5[0],
-		value:   w,
+		md5:   contentMd5[0],
+		value: w,
 	}
 	c.cache[req.Method][req.URL] = r
 }

@@ -88,10 +88,10 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
 	// r.Use(RedirectAssets(scp.Target))
 	r.Use(middleware.ThrottleBacklog(5, 20000, 30 * time.Second))
+	r.Use(Md5Cache())
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
 	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
 	r.Use(TryIndexOnNotFound(scp.Target))
-	r.Use(Md5Cache())
 
 	r.Handle("/*", NewStorageContainerReverseProxy(scp.Target))
 
@@ -273,10 +273,12 @@ func Md5Cache() func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 			cachedRes := cache.get(req)
 			if cachedRes != nil {
+				log.Printf("[INFO] found a cached version for %s\n", req.URL.String())
 				cachedRes.WriteTo(res)
 				return
 			}
 
+			log.Printf("[INFO] update cache for %s\n", req.URL.String())
 			innerRes := NewCachedResponseWriter()
 			next.ServeHTTP(innerRes, req)
 			cache.put(req, innerRes)
