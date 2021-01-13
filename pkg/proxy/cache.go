@@ -22,7 +22,7 @@ func CheckUrlMD5(target *url.URL) (string, error) {
 		return "", err
 	}
 	resp.Body.Close()
-	contentMd5 := resp.Header["Content-MD5"]
+	contentMd5 := resp.Header["Content-Md5"]
 	if len(contentMd5) != 1 {
 		return "", errors.New("no md5 present")
 	}
@@ -114,7 +114,7 @@ func (c *ResponseCache) put(req *http.Request, w *CachedResponseWriter) {
 		c.cache[req.Method] = make(map[*url.URL]*CachedResponse)
 	}
 
-	contentMd5 := w.Header()["Content-MD5"]
+	contentMd5 := w.Header()["Content-Md5"]
 	log.Printf("[INFO] response headers are: %v\n", w.Header())
 	log.Printf("[INFO] found md5 for: %s is %s\n", req.URL.String(), contentMd5)
 	if len(contentMd5) != 1 {
