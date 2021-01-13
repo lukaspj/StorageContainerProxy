@@ -3,14 +3,16 @@ package proxy
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/cors"
 )
 
 type Config struct {
@@ -73,6 +75,15 @@ func (scp *StorageContainerProxyHandler) Listen() {
 
 	r := chi.NewRouter()
 
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{
+			"http://localhost",
+			"http://127.0.0.1",
+			"https://bryrupteater.dk",
+			"https://www.bryrupteater.dk",
+			fmt.Sprintf("%s://%s", scp.Target.Scheme, scp.Target.Host)},
+		AllowedHeaders: []string{"*"},
+	}))
 	r.Use(middleware.Compress(5))
 	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
@@ -150,7 +161,7 @@ func CheckUrlExists(target *url.URL) (int, error) {
 func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			urlCopy :=  &url.URL{}
+			urlCopy := &url.URL{}
 			*urlCopy = *target
 			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
 			statusCode, err := CheckUrlExists(urlCopy)
@@ -180,7 +191,7 @@ func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) ht
 func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			urlCopy :=  &url.URL{}
+			urlCopy := &url.URL{}
 			*urlCopy = *target
 			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
 			statusCode, err := CheckUrlExists(urlCopy)
@@ -211,7 +222,7 @@ func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Ha
 func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			urlCopy :=  &url.URL{}
+			urlCopy := &url.URL{}
 			*urlCopy = *target
 			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
 			statusCode, err := CheckUrlExists(urlCopy)
