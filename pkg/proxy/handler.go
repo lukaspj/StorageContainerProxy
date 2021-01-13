@@ -86,9 +86,9 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	}))
 	r.Use(middleware.Compress(5))
 	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
-	r.Use(RedirectAssetsByExtension(scp.Target,[]string{"jpg", "png", "jpeg", "js", "woff2"}))
+	// r.Use(RedirectAssetsByExtension(scp.Target,[]string{".jpg", ".png", ".jpeg", ".js", ".woff2"}))
 	r.Use(middleware.ThrottleBacklog(5, 20000, 30 * time.Second))
-	r.Use(Md5Cache())
+	r.Use(Md5Cache(scp.Target))
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
 	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
 	r.Use(TryIndexOnNotFound(scp.Target))
@@ -271,11 +271,15 @@ func RedirectAssetsByExtension(target *url.URL, extensions []string) func(http.H
 	}
 }
 
-func Md5Cache() func(next http.Handler) http.Handler {
+func Md5Cache(target *url.URL) func(next http.Handler) http.Handler {
 	cache := NewMd5ResponseCache()
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			cachedRes := cache.get(req)
+			urlCopy := &url.URL{}
+			*urlCopy = *target
+			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
+
+			cachedRes := cache.get(req.Method, urlCopy)
 			if cachedRes != nil {
 				log.Printf("[INFO] found a cached version for %s\n", req.URL.String())
 				cachedRes.WriteTo(res)
@@ -285,7 +289,7 @@ func Md5Cache() func(next http.Handler) http.Handler {
 			log.Printf("[INFO] update cache for %s\n", req.URL.String())
 			innerRes := NewCachedResponseWriter()
 			next.ServeHTTP(innerRes, req)
-			cache.put(req, innerRes)
+			cache.put(req.Method, urlCopy, innerRes)
 			innerRes.WriteTo(res)
 		})
 	}

@@ -21,8 +21,8 @@ func CheckUrlMD5(target *url.URL) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp.Body.Close()
 	contentMd5 := resp.Header["Content-Md5"]
+	resp.Body.Close()
 	if len(contentMd5) != 1 {
 		return "", errors.New("no md5 present")
 	}
@@ -81,31 +81,31 @@ func NewMd5ResponseCache() *ResponseCache {
 	}
 }
 
-func (c *ResponseCache) get(req *http.Request) *CachedResponseWriter {
-	if req.Method != http.MethodGet {
+func (c *ResponseCache) get(method string, target *url.URL) *CachedResponseWriter {
+	if method != http.MethodGet {
 		return nil
 	}
 
-	if c.cache[req.Method] == nil {
-		c.cache[req.Method] = make(map[string]*CachedResponse)
+	if c.cache[method] == nil {
+		c.cache[method] = make(map[string]*CachedResponse)
 		return nil
 	}
-	r := c.cache[req.Method][req.URL.String()]
+	r := c.cache[method][target.Path]
 	log.Printf("[INFO] ccache: %v", c.cache)
-	log.Printf("[INFO] ccache for %s: %v", req.URL.String(), r)
+	log.Printf("[INFO] ccache for %s: %v", target.String(), r)
 	if r == nil {
 		return nil
 	}
 
-	urlMd5, err := CheckUrlMD5(req.URL)
-	log.Printf("[INFO] ResponseCache::get md5 for: %s is %s\n", req.URL.String(), urlMd5)
+	urlMd5, err := CheckUrlMD5(target)
+	log.Printf("[INFO] ResponseCache::get md5 for: %s is %s\n", target.String(), urlMd5)
 	if err != nil {
 		log.Printf("[ERROR] ResponseCache::get %v\n", err)
 		return nil
 	}
 
 	if r.md5 != urlMd5 {
-		c.cache[req.Method][req.URL.String()] = nil
+		c.cache[method][target.Path] = nil
 		log.Printf("[WARN] ResponseCache::get md5 mismatch: %s != %s -- updating\n", r.md5, urlMd5)
 		return nil
 	}
@@ -113,14 +113,14 @@ func (c *ResponseCache) get(req *http.Request) *CachedResponseWriter {
 	return r.value
 }
 
-func (c *ResponseCache) put(req *http.Request, w *CachedResponseWriter) {
-	if c.cache[req.Method] == nil {
-		c.cache[req.Method] = make(map[string]*CachedResponse)
+func (c *ResponseCache) put(method string, target *url.URL, w *CachedResponseWriter) {
+	if c.cache[method] == nil {
+		c.cache[method] = make(map[string]*CachedResponse)
 	}
 
 	contentMd5 := w.Header()["Content-Md5"]
 	log.Printf("[INFO] response headers are: %v\n", w.Header())
-	log.Printf("[INFO] found md5 for: %s is %s\n", req.URL.String(), contentMd5)
+	log.Printf("[INFO] found md5 for: %s is %s\n", target.Path, contentMd5)
 	if len(contentMd5) != 1 {
 		log.Printf("[INFO] len was %d\n", len(contentMd5))
 		return
@@ -129,5 +129,5 @@ func (c *ResponseCache) put(req *http.Request, w *CachedResponseWriter) {
 		md5:   contentMd5[0],
 		value: w,
 	}
-	c.cache[req.Method][req.URL.String()] = r
+	c.cache[method][target.Path] = r
 }
