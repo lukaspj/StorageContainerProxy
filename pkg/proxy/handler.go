@@ -88,7 +88,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
 	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
 	r.Use(TryIndexOnNotFound(scp.Target))
-	// r.Use(RedirectAssets(scp.Target))
+	r.Use(RedirectAssets(scp.Target))
 	r.Use(Md5Cache())
 
 	r.Handle("/*", NewStorageContainerReverseProxy(scp.Target))
