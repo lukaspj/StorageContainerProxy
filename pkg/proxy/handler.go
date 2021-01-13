@@ -86,7 +86,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	}))
 	r.Use(middleware.Compress(5))
 	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
-	r.Use(RedirectAssets(scp.Target))
+	// r.Use(RedirectAssets(scp.Target))
 	r.Use(middleware.ThrottleBacklog(5, 200, 30 * time.Second))
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
 	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
