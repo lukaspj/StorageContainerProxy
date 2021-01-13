@@ -79,8 +79,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 		AllowedOrigins: []string{
 			"http://localhost",
 			"http://127.0.0.1",
-			"https://bryrupteater.dk",
-			"https://www.bryrupteater.dk",
+			fmt.Sprintf("https://%s", scp.BaseDomain),
 			fmt.Sprintf("%s://%s", scp.Target.Scheme, scp.Target.Host)},
 		AllowedHeaders: []string{"*"},
 	}))
