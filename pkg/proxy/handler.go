@@ -134,6 +134,7 @@ func SubdomainAsSubpath(domain string, env string) func(http.Handler) http.Handl
 			} else if hostDotCount == domainDotCount+1 {
 				// Sub-path
 				req.URL.Path = strings.TrimSuffix(host, "." + domain)
+				log.Printf("[INFO] updated url path to: %s, based on subdomain", req.URL.Path)
 			} else {
 				// Too many subdomains
 				log.Printf("ERROR: %s had too many subdomains compared to %s", host, domain)
