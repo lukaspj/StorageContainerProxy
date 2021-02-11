@@ -127,6 +127,7 @@ func SubdomainAsSubpath(domain string, env string) func(http.Handler) http.Handl
 				return
 			}
 			hostDotCount := strings.Count(host, ".")
+			req.URL.RawPath = ""
 			if hostDotCount == domainDotCount {
 				// Default path
 				req.URL.Path = "/" + env + req.URL.Path
@@ -182,6 +183,7 @@ func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) ht
 					return
 				}
 				if statusCode != 404 {
+					req.URL.RawPath = ""
 					req.URL.Path = req.URL.Path + ".html"
 				}
 			}
@@ -213,6 +215,7 @@ func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Ha
 					return
 				}
 				if statusCode != 404 {
+					req.URL.RawPath = ""
 					req.URL.Path = req.URL.Path + "/index.html"
 				}
 			}
@@ -239,6 +242,7 @@ func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
 				if !strings.Contains(req.URL.Path, "/") {
 
 				}
+				req.URL.RawPath = ""
 				req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")] + "/index.html"
 			}
 			next.ServeHTTP(res, req)
