@@ -132,7 +132,7 @@ func SubdomainAsSubpath(domain string, env string) func(http.Handler) http.Handl
 				req.URL.Path = "/" + env + req.URL.Path
 			} else if hostDotCount == domainDotCount+1 {
 				// Sub-path
-				req.URL.Path = strings.TrimSuffix(host, domain)
+				req.URL.Path = strings.TrimSuffix(host, "." + domain)
 			} else {
 				// Too many subdomains
 				log.Printf("ERROR: %s had too many subdomains compared to %s", host, domain)
@@ -235,7 +235,10 @@ func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
 			}
 
 			if statusCode == 404 && !strings.HasSuffix(req.URL.Path, "/index.html") {
-				log.Printf("%s was not found, trying index.html instead\n", urlCopy.String())
+				log.Printf("%s was not found (path: %s), trying index.html instead\n", urlCopy.String(), req.URL.Path)
+				if !strings.Contains(req.URL.Path, "/") {
+
+				}
 				req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")] + "/index.html"
 			}
 			next.ServeHTTP(res, req)
