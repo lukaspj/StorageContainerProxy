@@ -79,6 +79,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{
 			"http://localhost",
+			"http://localhost:*",
 			"http://127.0.0.1",
 			fmt.Sprintf("https://%s", scp.BaseDomain),
 			fmt.Sprintf("https://*.%s", scp.BaseDomain),
