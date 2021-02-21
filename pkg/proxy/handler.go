@@ -198,17 +198,13 @@ func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) ht
 func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			urlCopy := &url.URL{}
-			*urlCopy = *target
-			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
-			statusCode, err := CheckUrlExists(urlCopy)
-			if err != nil {
-				res.WriteHeader(500)
-				log.Printf("[ERROR] %v\n", err)
-				return
-			}
+			w := NewCachedResponseWriter()
 
-			if statusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
+			next.ServeHTTP(w, req)
+
+			if w.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
+				urlCopy := &url.URL{}
+				*urlCopy = *target
 				log.Printf("%s was not found, trying %s/index.html instead\n", urlCopy.String(), urlCopy.String())
 				urlCopy.Path = urlCopy.Path + "/index.html"
 				statusCode, err := CheckUrlExists(urlCopy)
@@ -221,34 +217,40 @@ func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Ha
 					req.URL.RawPath = ""
 					req.URL.Path = req.URL.Path + "/index.html"
 				}
+
+				next.ServeHTTP(res, req)
+			} else {
+				err := w.WriteTo(res)
+				if err != nil {
+					res.WriteHeader(500)
+					log.Printf("[ERROR] %v\n", err)
+				}
 			}
-			next.ServeHTTP(res, req)
 		})
 	}
 }
 
-func TryIndexOnNotFound(target *url.URL) func(next http.Handler) http.Handler {
+func TryIndexOnNotFound() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			urlCopy := &url.URL{}
-			*urlCopy = *target
-			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
-			statusCode, err := CheckUrlExists(urlCopy)
-			if err != nil {
-				res.WriteHeader(500)
-				log.Printf("[ERROR] %v\n", err)
-				return
-			}
+			w := NewCachedResponseWriter()
 
-			if statusCode == 404 && !strings.HasSuffix(req.URL.Path, "/index.html") {
-				log.Printf("%s was not found (path: %s), trying index.html instead\n", urlCopy.String(), req.URL.Path)
-				if !strings.Contains(req.URL.Path, "/") {
+			next.ServeHTTP(w, req)
 
-				}
+			if w.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/index.html") {
+				log.Printf("%s was not found (path: %s), trying index.html instead\n", req.URL.String(), req.URL.Path)
 				req.URL.RawPath = ""
 				req.URL.Path = req.URL.Path[:strings.LastIndex(req.URL.Path, "/")] + "/index.html"
+				next.ServeHTTP(res, req)
+			} else {
+				err := w.WriteTo(res)
+				if err != nil {
+					res.WriteHeader(500)
+					log.Printf("[ERROR] %v\n", err)
+				}
+
+				return
 			}
-			next.ServeHTTP(res, req)
 		})
 	}
 }
