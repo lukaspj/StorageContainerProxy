@@ -93,7 +93,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	r.Use(Md5Cache(scp.Target))
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
 	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
-	r.Use(TryIndexOnNotFound(scp.Target))
+	r.Use(TryIndexOnNotFound())
 
 	r.Handle("/*", NewStorageContainerReverseProxy(scp.Target))
 
@@ -284,7 +284,7 @@ func RedirectAssetsByExtension(target *url.URL, extensions []string) func(http.H
 }
 
 func Md5Cache(target *url.URL) func(next http.Handler) http.Handler {
-	cache := NewMd5ResponseCache()
+	cache := NewMd5ResponseCache(10 * time.Second)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 			urlCopy := &url.URL{}
