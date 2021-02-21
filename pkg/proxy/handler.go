@@ -91,9 +91,9 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	r.Use(RedirectAssetsByExtension(scp.Target,[]string{".jpg", ".png", ".jpeg"}))
 	r.Use(middleware.ThrottleBacklog(5, 20000, 30 * time.Second))
 	r.Use(Md5Cache(scp.Target))
-	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
-	r.Use(AddHtmlIfNoExtensionAndNotFound(scp.Target))
 	r.Use(TryIndexOnNotFound())
+	r.Use(AddHtmlIfNoExtensionAndNotFound())
+	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
 
 	r.Handle("/*", NewStorageContainerReverseProxy(scp.Target))
 
@@ -164,33 +164,24 @@ func CheckUrlExists(target *url.URL) (int, error) {
 	return resp.StatusCode, nil
 }
 
-func AddHtmlIfNoExtensionAndNotFound(target *url.URL) func(next http.Handler) http.Handler {
+func AddHtmlIfNoExtensionAndNotFound() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			urlCopy := &url.URL{}
-			*urlCopy = *target
-			urlCopy.Path, urlCopy.RawPath = joinURLPath(urlCopy, req.URL)
-			statusCode, err := CheckUrlExists(urlCopy)
-			if err != nil {
-				res.WriteHeader(500)
-				log.Printf("[ERROR]: %v\n", err)
-				return
-			}
+			w := NewCachedResponseWriter()
 
-			if statusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
-				urlCopy.Path = urlCopy.Path + ".html"
-				statusCode, err := CheckUrlExists(urlCopy)
+			next.ServeHTTP(w, req)
+
+			if w.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
+				req.URL.RawPath = ""
+				req.URL.Path = req.URL.Path + ".html"
+				next.ServeHTTP(res, req)
+			} else {
+				err := w.WriteTo(res)
 				if err != nil {
 					res.WriteHeader(500)
-					log.Printf("[ERROR]: %v\n", err)
-					return
-				}
-				if statusCode != 404 {
-					req.URL.RawPath = ""
-					req.URL.Path = req.URL.Path + ".html"
+					log.Printf("[ERROR] %v\n", err)
 				}
 			}
-			next.ServeHTTP(res, req)
 		})
 	}
 }
@@ -203,20 +194,9 @@ func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Ha
 			next.ServeHTTP(w, req)
 
 			if w.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/") && filepath.Ext(req.URL.Path) == "" {
-				urlCopy := &url.URL{}
-				*urlCopy = *target
-				log.Printf("%s was not found, trying %s/index.html instead\n", urlCopy.String(), urlCopy.String())
-				urlCopy.Path = urlCopy.Path + "/index.html"
-				statusCode, err := CheckUrlExists(urlCopy)
-				if err != nil {
-					res.WriteHeader(500)
-					log.Printf("[ERROR] %v\n", err)
-					return
-				}
-				if statusCode != 404 {
-					req.URL.RawPath = ""
-					req.URL.Path = req.URL.Path + "/index.html"
-				}
+				log.Printf("%s was not found, trying %s/index.html instead\n", req.URL.String(), req.URL.String())
+				req.URL.RawPath = ""
+				req.URL.Path = req.URL.Path + "/index.html"
 
 				next.ServeHTTP(res, req)
 			} else {
