@@ -90,10 +90,10 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
 	r.Use(RedirectAssetsByExtension(scp.Target,[]string{".jpg", ".png", ".jpeg", ".zip", ".js"}))
 	r.Use(middleware.ThrottleBacklog(5, 20000, 30 * time.Second))
-	r.Use(Md5Cache(scp.Target))
 	r.Use(TryIndexOnNotFound())
 	r.Use(AddHtmlIfNoExtensionAndNotFound())
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
+	r.Use(Md5Cache(scp.Target))
 
 	r.Handle("/*", NewStorageContainerReverseProxy(scp.Target))
 
