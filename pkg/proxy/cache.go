@@ -94,7 +94,7 @@ func (c *ResponseCache) get(method string, target *url.URL) *CachedResponseWrite
 		c.cache[method] = make(map[string]*CachedResponse)
 		return nil
 	}
-	r := c.cache[method][target.Path]
+	r := c.cache[method][target.String()]
 	if r == nil {
 		return nil
 	}
@@ -111,7 +111,7 @@ func (c *ResponseCache) get(method string, target *url.URL) *CachedResponseWrite
 	}
 
 	if r.md5 != urlMd5 {
-		c.cache[method][target.Path] = nil
+		c.cache[method][target.String()] = nil
 		log.Printf("[WARN] ResponseCache::get md5 mismatch: %s != %s -- updating\n", r.md5, urlMd5)
 		return nil
 	}
@@ -128,7 +128,7 @@ func (c *ResponseCache) put(method string, target *url.URL, w *CachedResponseWri
 
 	contentMd5 := w.Header()["Content-Md5"]
 	log.Printf("[INFO] response headers are: %v\n", w.Header())
-	log.Printf("[INFO] found md5 for: %s is %s\n", target.Path, contentMd5)
+	log.Printf("[INFO] found md5 for: %s is %s\n", target.String(), contentMd5)
 	if len(contentMd5) != 1 {
 		log.Printf("[INFO] len was %d\n", len(contentMd5))
 		return
@@ -138,5 +138,5 @@ func (c *ResponseCache) put(method string, target *url.URL, w *CachedResponseWri
 		value: w,
 		checked: time.Now(),
 	}
-	c.cache[method][target.Path] = r
+	c.cache[method][target.String()] = r
 }
