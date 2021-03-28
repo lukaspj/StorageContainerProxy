@@ -224,7 +224,7 @@ func TryDefaultEnvOnNotFound(defaultEnv string) func(next http.Handler) http.Han
 
 			next.ServeHTTP(w, req)
 
-			if w.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/index.html") {
+			if w.StatusCode == 404 {
 				newPath := "/" + defaultEnv + req.URL.Path
 				log.Printf("%s was not found (path: %s), trying %s instead\n", req.URL.String(), req.URL.Path, newPath)
 				req.URL.RawPath = ""
