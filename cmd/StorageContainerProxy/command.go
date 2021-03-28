@@ -43,7 +43,6 @@ func GetRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&storageContainer, "azStorageContainer", "", "")
 	rootCmd.PersistentFlags().StringVar(&baseDomain, "baseDomain", "", "")
 	rootCmd.PersistentFlags().StringVar(&defaultEnv, "defaultEnv", "master", "")
-	rootCmd.PersistentFlags().StringVar(&defaultEnv, "defaultEnv", "master", "")
 	rootCmd.PersistentFlags().BoolVar(&useSubdomains, "useSubdomains", true, "")
 
 	rootCmd.MarkPersistentFlagRequired("azStorageAccount")
