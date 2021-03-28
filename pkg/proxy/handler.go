@@ -93,7 +93,7 @@ func (scp *StorageContainerProxyHandler) Listen() {
 	if scp.UseSubdomains {
 		r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
 	} else {
-		r.Use(TryDefaultEnvOnNotFound())
+		r.Use(TryDefaultEnvOnNotFound(scp.DefaultEnv))
 	}
 	r.Use(RedirectAssetsByExtension(scp.Target, []string{".jpg", ".png", ".jpeg", ".zip", ".js"}))
 	r.Use(middleware.ThrottleBacklog(5, 20000, 30*time.Second))
