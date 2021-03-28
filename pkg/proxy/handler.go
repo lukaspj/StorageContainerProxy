@@ -21,6 +21,7 @@ type Config struct {
 	AzureStorageContainer string
 	BaseDomain            string
 	DefaultEnv            string
+	UseSubdomains         bool
 }
 
 type StorageContainerProxyHandler struct {
@@ -28,6 +29,7 @@ type StorageContainerProxyHandler struct {
 	AzureStorageContainer string
 	BaseDomain            string
 	DefaultEnv            string
+	UseSubdomains         bool
 	Target                *url.URL
 }
 
@@ -37,6 +39,7 @@ func NewHandler(config *Config) StorageContainerProxyHandler {
 		AzureStorageContainer: config.AzureStorageContainer,
 		BaseDomain:            config.BaseDomain,
 		DefaultEnv:            config.DefaultEnv,
+		UseSubdomains:         config.UseSubdomains,
 		Target: &url.URL{
 			Scheme: "https",
 			Host:   fmt.Sprintf("%s.blob.core.windows.net", config.AzureStorageAccount),
@@ -87,9 +90,13 @@ func (scp *StorageContainerProxyHandler) Listen() {
 		AllowedHeaders: []string{"*"},
 	}))
 	r.Use(middleware.Compress(5))
-	r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
-	r.Use(RedirectAssetsByExtension(scp.Target,[]string{".jpg", ".png", ".jpeg", ".zip", ".js"}))
-	r.Use(middleware.ThrottleBacklog(5, 20000, 30 * time.Second))
+	if scp.UseSubdomains {
+		r.Use(SubdomainAsSubpath(scp.BaseDomain, scp.DefaultEnv))
+	} else {
+		r.Use(TryDefaultEnvOnNotFound())
+	}
+	r.Use(RedirectAssetsByExtension(scp.Target, []string{".jpg", ".png", ".jpeg", ".zip", ".js"}))
+	r.Use(middleware.ThrottleBacklog(5, 20000, 30*time.Second))
 	r.Use(TryIndexOnNotFound())
 	r.Use(AddHtmlIfNoExtensionAndNotFound())
 	r.Use(AddTrailingSlashIfNoExtensionAndNotFound(scp.Target))
@@ -135,7 +142,7 @@ func SubdomainAsSubpath(domain string, env string) func(http.Handler) http.Handl
 				req.URL.Path = "/" + env + req.URL.Path
 			} else if hostDotCount == domainDotCount+1 {
 				// Sub-path
-				req.URL.Path = "/" + strings.TrimSuffix(host, "." + domain) + req.URL.Path
+				req.URL.Path = "/" + strings.TrimSuffix(host, "."+domain) + req.URL.Path
 				log.Printf("[INFO] updated url path to: %s, based on subdomain", req.URL.Path)
 			} else {
 				// Too many subdomains
@@ -205,6 +212,32 @@ func AddTrailingSlashIfNoExtensionAndNotFound(target *url.URL) func(next http.Ha
 					res.WriteHeader(500)
 					log.Printf("[ERROR] %v\n", err)
 				}
+			}
+		})
+	}
+}
+
+func TryDefaultEnvOnNotFound(defaultEnv string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+			w := NewCachedResponseWriter()
+
+			next.ServeHTTP(w, req)
+
+			if w.StatusCode == 404 && !strings.HasSuffix(req.URL.Path, "/index.html") {
+				newPath := "/" + defaultEnv + req.URL.Path
+				log.Printf("%s was not found (path: %s), trying %s instead\n", req.URL.String(), req.URL.Path, newPath)
+				req.URL.RawPath = ""
+				req.URL.Path = newPath
+				next.ServeHTTP(res, req)
+			} else {
+				err := w.WriteTo(res)
+				if err != nil {
+					res.WriteHeader(500)
+					log.Printf("[ERROR] %v\n", err)
+				}
+
+				return
 			}
 		})
 	}
